@@ -73,3 +73,61 @@ class TaskStatusResponse(BaseModel):
 asdad
 
 asdad
+@app.get("/health")
+async def health_check():
+    return {
+        "status": "healthy",    
+        "service": "Phone Detective Analysis",
+        "version": "1.0.0"
+    }
+
+@app.post('/analyze-async', response_model=AsyncAnalysisResponse)
+async def run_analysis_async(request: AnalysisRequest, background_tasks:BackgroundTasks) -> AsyncAnalysisResponse:
+    try:
+        task_id = str(uuid.uuid4())
+        with task_lock:
+            task_store[task_id] = {
+                "task_id": task_id,
+                "status": "pending",
+                "progress": "Task queued for processing",
+                "created_at": datetime.now().isoformat(),
+                "updated_at": datetime.now().isoformat(),
+                "folder_path": request.folder_path,
+                "target_language": request.target_language,
+                "similarity_threshold": request.similarity_threshold,
+                "result": None,
+                "error": None
+            }
+        background_tasks.add_task(
+            run_analysis_background,
+            task_id,
+            request.folder_path,
+            request.target_language,
+            request.similarity_threshold
+        )
+        logger.info(f'Started async analysis task {task_id} for folder: {request.folder_path}')
+        return AsyncAnalysisResponse(
+            task_id= task_id,
+            status= "pending",
+            message= f'Analysis task started. Use /status/{task_id} to check progress.',
+            estimated_time_minutes=10 
+        )
+    except Exception as e:
+        logger.error(f'Failed to start async anaalysis: {e}')
+        raise HTTPException(status_code=500, detail=f"Failed to start analysis: {str(e)}")
+
+@app.post("/analyze", response_model=AnalysisResponse)
+async def run_analysis(request: AnalysisRequest) -> AnalysisResponse:
+    try:
+        logger.info(f'Starting analysis for folder: {request.folder_path}')
+        logger.info(f'Target language: {request.target_language}')
+        logger.info(f'Similarity threshold: {request.similarity_threshold}')
+        report_file_path = run_analysis_and_generate_report(
+            folder_path=request.folder_path,
+            target_language=request.target_language,
+            similarity_threshold=request.similarity_threshold
+        )
+        report_data = None
+
+        你好
+         
